@@ -32,13 +32,13 @@ if __name__ == "__main__":
 
     # Prepare pipelines
     pipe = prepare_pipeline(
-        base_model="stabilityai/stable-diffusion-xl-base-1.0",
+        base_model="lykon/dreamshaper-xl-v2-turbo",
         vae_model="madebyollin/sdxl-vae-fp16-fix",
         unet_model=None,
         lora_model=None,
         adapter_path="huanngzh/mv-adapter",
         scheduler=None,
-        num_views=num_views,
+        num_views=6,
         device=device,
         dtype=torch.float16,
     )
@@ -74,9 +74,9 @@ if __name__ == "__main__":
         num_views=num_views,
         text=args.text,
         image=args.image,
-        height=768,
-        width=768,
-        num_inference_steps=50,
+        height=1024,
+        width=1024,
+        num_inference_steps=16,
         guidance_scale=3.0,
         seed=args.seed,
         reference_conditioning_scale=args.reference_conditioning_scale,
