@@ -225,6 +225,7 @@ class TexturePipeline:
         }
         mod_uv_image, mod_uv_tensor = {}, {}
         for mod_name, (mod_path, mod_process_config) in mod_kwargs.items():
+            print('Mod: {}'.format(mod_name))
             if mod_path is None:
                 mod_uv_image[mod_name] = None
                 mod_uv_tensor[mod_name] = None

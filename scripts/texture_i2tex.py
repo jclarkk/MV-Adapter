@@ -97,6 +97,10 @@ if __name__ == "__main__":
     if args.pbr:
         from mvadapter.pipelines.pipeline_pbr import generate_pbr_for_batch, RGB2XPipeline, StableNormalPipeline
 
+        # Replace the rgb
+        albedo_path = os.path.join(args.save_dir, f"{args.save_name}.png")
+        mv_path = None
+
         pre_pbr_multiviews = [view.resize((1024, 1024)) for view in images[:6]]
         t0 = time.time()
         normal_pipe = StableNormalPipeline.from_pretrained(device)
@@ -111,10 +115,6 @@ if __name__ == "__main__":
 
         normal_path = os.path.join(args.save_dir, f"{args.save_name}_normal.png")
         make_image_grid(normal_multiviews, rows=1).save(normal_path)
-
-        normal_image = Image.open(normal_path)
-        normal_image = normal_image.resize((4096, 4096), Image.LANCZOS)
-        normal_image.save(normal_path)
 
         print(f"Generating normal maps took {t1 - t0:.2f} seconds")
 
@@ -136,8 +136,6 @@ if __name__ == "__main__":
         roughness_array = numpy.asarray(roughness_image)
 
         orm_image = RGB2XPipeline.combine_roughness_metalness(metallic_array, roughness_array)
-        # Upscale ORM to UV size
-        orm_image = orm_image.resize((4096, 4096), Image.LANCZOS)
         orm_path = os.path.join(args.save_dir, f"{args.save_name}_orm.png")
         orm_image.save(orm_path)
 
@@ -153,6 +151,8 @@ if __name__ == "__main__":
         uv_size=4096,
         rgb_path=mv_path,
         rgb_process_config=ModProcessConfig(view_upscale=args.upscale, inpaint_mode="view"),
+        base_color_path=albedo_path,
+        base_color_process_config=ModProcessConfig(view_upscale=upscale, inpaint_mode="view"),
         orm_path=orm_path,
         orm_process_config=ModProcessConfig(view_upscale=False, inpaint_mode="view"),
         normal_path=normal_path,
