@@ -207,7 +207,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Models
     parser.add_argument(
-        "--base_model", type=str, default="stabilityai/stable-diffusion-xl-base-1.0"
+        "--base_model", type=str, default="lykon/dreamshaper-xl-v2-turbo"
     )
     parser.add_argument(
         "--vae_model", type=str, default="madebyollin/sdxl-vae-fp16-fix"
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     parser.add_argument("--mesh", type=str, required=True)
     parser.add_argument("--image", type=str, required=True)
     parser.add_argument("--text", type=str, required=False, default="high quality")
-    parser.add_argument("--num_inference_steps", type=int, default=50)
+    parser.add_argument("--num_inference_steps", type=int, default=16)
     parser.add_argument("--guidance_scale", type=float, default=3.0)
     parser.add_argument("--seed", type=int, default=-1)
     parser.add_argument("--lora_scale", type=float, default=1.0)
@@ -272,8 +272,8 @@ if __name__ == "__main__":
         num_views=args.num_views,
         text=args.text,
         image=args.image,
-        height=768,
-        width=768,
+        height=1024,
+        width=1024,
         num_inference_steps=args.num_inference_steps,
         guidance_scale=args.guidance_scale,
         seed=args.seed,
