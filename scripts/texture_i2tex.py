@@ -1,14 +1,15 @@
 import argparse
 import os
-import sys
+import time
 
+import numpy
 import torch
+from PIL import Image
 from torchvision import transforms
 from transformers import AutoModelForImageSegmentation
 
 from mvadapter.pipelines.pipeline_texture import ModProcessConfig, TexturePipeline
 from mvadapter.utils import make_image_grid
-
 from .inference_ig2mv_sdxl import prepare_pipeline, remove_bg, run_pipeline
 
 if __name__ == "__main__":
@@ -25,6 +26,9 @@ if __name__ == "__main__":
     parser.add_argument("--reference_conditioning_scale", type=float, default=1.0)
     parser.add_argument("--preprocess_mesh", action="store_true")
     parser.add_argument("--remove_bg", action="store_true")
+    parser.add_argument("--upscale", action="store_true")
+    parser.add_argument("--pbr", action="store_true")
+    parser.add_argument('--topaz', action='store_true')
     args = parser.parse_args()
 
     device = args.device
@@ -59,7 +63,7 @@ if __name__ == "__main__":
         remove_bg_fn = None
 
     texture_pipe = TexturePipeline(
-        upscaler_ckpt_path="./checkpoints/RealESRGAN_x2plus.pth",
+        upscaler_ckpt_path="./checkpoints/realesr-general-x4v3.pth",
         inpaint_ckpt_path="./checkpoints/big-lama.pt",
         device=device,
     )
@@ -89,6 +93,56 @@ if __name__ == "__main__":
 
     torch.cuda.empty_cache()
 
+    normal_path, albedo_path, orm_path = None, None, None
+    if args.pbr:
+        from mvadapter.pipelines.pipeline_pbr import generate_pbr_for_batch, RGB2XPipeline, StableNormalPipeline
+
+        pre_pbr_multiviews = [view.resize((1024, 1024)) for view in images[:6]]
+        t0 = time.time()
+        normal_pipe = StableNormalPipeline.from_pretrained(device)
+
+        normal_multiviews = []
+        i = 0
+        for view in pre_pbr_multiviews:
+            curr_normal_view = normal_pipe(view)
+            i += 1
+            normal_multiviews.append(curr_normal_view)
+        t1 = time.time()
+
+        normal_path = os.path.join(args.save_dir, f"{args.save_name}_normal.png")
+        make_image_grid(normal_multiviews, rows=1).save(normal_path)
+
+        normal_image = Image.open(normal_path)
+        normal_image = normal_image.resize((4096, 4096), Image.LANCZOS)
+        normal_image.save(normal_path)
+
+        print(f"Generating normal maps took {t1 - t0:.2f} seconds")
+
+        # Do it in batches of 6
+        t0 = time.time()
+        albedo_multiviews, metallic_multiviews, _, roughness_multiviews = generate_pbr_for_batch(pre_pbr_multiviews)
+        t1 = time.time()
+
+        metallic_path = os.path.join(args.save_dir, f"{args.save_name}_metallic.png")
+        make_image_grid(metallic_multiviews, rows=1).save(metallic_path)
+
+        roughness_path = os.path.join(args.save_dir, f"{args.save_name}_roughness.png")
+        make_image_grid(roughness_multiviews, rows=1).save(roughness_path)
+
+        metallic_image = Image.open(metallic_path)
+        metallic_array = numpy.asarray(metallic_image)
+
+        roughness_image = Image.open(roughness_path)
+        roughness_array = numpy.asarray(roughness_image)
+
+        orm_image = RGB2XPipeline.combine_roughness_metalness(metallic_array, roughness_array)
+        # Upscale ORM to UV size
+        orm_image = orm_image.resize((4096, 4096), Image.LANCZOS)
+        orm_path = os.path.join(args.save_dir, f"{args.save_name}_orm.png")
+        orm_image.save(orm_path)
+
+        print(f"Generating PBR maps took {t1 - t0:.2f} seconds")
+
     # 2. un-project and complete texture
     out = texture_pipe(
         mesh_path=args.mesh,
@@ -98,7 +152,12 @@ if __name__ == "__main__":
         preprocess_mesh=args.preprocess_mesh,
         uv_size=4096,
         rgb_path=mv_path,
-        rgb_process_config=ModProcessConfig(view_upscale=True, inpaint_mode="view"),
+        rgb_process_config=ModProcessConfig(view_upscale=args.upscale, inpaint_mode="view"),
+        orm_path=orm_path,
+        orm_process_config=ModProcessConfig(view_upscale=False, inpaint_mode="view"),
+        normal_path=normal_path,
+        normal_process_config=ModProcessConfig(view_upscale=False, inpaint_mode="view"),
         camera_azimuth_deg=[x - 90 for x in [0, 90, 180, 270, 180, 180]],
+        use_topaz=args.topaz,
     )
     print(f"Output saved to {out.shaded_model_save_path}")

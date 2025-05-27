@@ -86,22 +86,31 @@ class TexturePipeline:
         upscale: bool,
         upscale_factor: int,
         batched: bool = False,
+        use_topaz: bool = False,
     ) -> Optional[torch.FloatTensor]:
         if upscale:
-            with torch.no_grad():
-                tensor = tensor.permute(0, 3, 1, 2)
-                if batched:
-                    tensor = self.upscaler(tensor.half()).float()
-                else:
-                    tensor = torch.concat(
-                        [
-                            self.upscaler(im.unsqueeze(0).half()).float()
-                            for im in tensor
-                        ],
-                        dim=0,
-                    )
-                tensor = tensor.clamp(0, 1).permute(0, 2, 3, 1)
-            clear()
+            if use_topaz:
+                from mvadapter.utils.topaz import TopazAPIUpscalerPipeline
+                topaz_upscaler = TopazAPIUpscalerPipeline()
+
+                img = tensor_to_image(tensor, batched=False)
+                upscaled_img = topaz_upscaler(img)
+                tensor = image_to_tensor([upscaled_img], device=self.device)[0]
+            else:
+                with torch.no_grad():
+                    tensor = tensor.permute(0, 3, 1, 2)
+                    if batched:
+                        tensor = self.upscaler(tensor.half()).float()
+                    else:
+                        tensor = torch.concat(
+                            [
+                                self.upscaler(im.unsqueeze(0).half()).float()
+                                for im in tensor
+                            ],
+                            dim=0,
+                        )
+                    tensor = tensor.clamp(0, 1).permute(0, 2, 3, 1)
+                clear()
         return tensor
 
     def view_inpaint(
@@ -167,6 +176,8 @@ class TexturePipeline:
         camera_distance: float = 1.0,
         camera_ortho_scale: float = 1.1,
         camera_fov_deg: float = 40,
+        # upscale,
+        use_topaz: bool = False,
         # debug
         debug_mode: bool = False,
     ):
