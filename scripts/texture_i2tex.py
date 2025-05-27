@@ -152,7 +152,7 @@ if __name__ == "__main__":
         rgb_path=mv_path,
         rgb_process_config=ModProcessConfig(view_upscale=args.upscale, inpaint_mode="view"),
         base_color_path=albedo_path,
-        base_color_process_config=ModProcessConfig(view_upscale=upscale, inpaint_mode="view"),
+        base_color_process_config=ModProcessConfig(view_upscale=args.upscale, inpaint_mode="view"),
         orm_path=orm_path,
         orm_process_config=ModProcessConfig(view_upscale=False, inpaint_mode="view"),
         normal_path=normal_path,
