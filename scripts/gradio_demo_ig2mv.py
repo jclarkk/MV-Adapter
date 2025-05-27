@@ -50,7 +50,7 @@ transform_image = transforms.Compose([
 
 def infer(
         prompt, image, mesh, do_rembg=True, seed=42, randomize_seed=False,
-        guidance_scale=3.0, num_inference_steps=50, reference_conditioning_scale=1.0,
+        guidance_scale=3.0, num_inference_steps=16, reference_conditioning_scale=1.0,
         negative_prompt="watermark, ugly, deformed, noisy, blurry, low contrast",
         progress=gr.Progress(track_tqdm=True),
 ):
@@ -125,7 +125,7 @@ with gr.Blocks() as demo:
                 seed = gr.Slider(label="Seed", minimum=0, maximum=MAX_SEED, step=1, value=0)
                 randomize_seed = gr.Checkbox(label="Randomize Seed", value=True)
                 guidance_scale = gr.Slider(label="CFG Scale", minimum=0, maximum=10, step=0.1, value=3.0)
-                num_inference_steps = gr.Slider(label="Inference Steps", minimum=1, maximum=100, step=1, value=50)
+                num_inference_steps = gr.Slider(label="Inference Steps", minimum=1, maximum=100, step=1, value=16)
                 reference_conditioning_scale = gr.Slider(label="Reference Conditioning", minimum=0, maximum=2, step=0.1,
                                                          value=1.0)
                 negative_prompt = gr.Textbox(label="Negative Prompt",
