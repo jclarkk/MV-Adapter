@@ -158,4 +158,6 @@ def generate_pbr_for_batch(pre_pbr_multiviews):
     normal_multiviews = _split_images(normal)
     roughness_multiviews = _split_images(roughness)
     metallic_multiviews = _split_images(metallic)
+    del pbr_pipeline
+    torch.cuda.empty_cache()
     return albedo_multiviews, metallic_multiviews, normal_multiviews, roughness_multiviews

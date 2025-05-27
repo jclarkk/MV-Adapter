@@ -102,21 +102,6 @@ if __name__ == "__main__":
         mv_path = None
 
         pre_pbr_multiviews = [view.resize((1024, 1024)) for view in images[:6]]
-        t0 = time.time()
-        normal_pipe = StableNormalPipeline.from_pretrained(device)
-
-        normal_multiviews = []
-        i = 0
-        for view in pre_pbr_multiviews:
-            curr_normal_view = normal_pipe(view)
-            i += 1
-            normal_multiviews.append(curr_normal_view)
-        t1 = time.time()
-
-        normal_path = os.path.join(args.save_dir, f"{args.save_name}_normal.png")
-        make_image_grid(normal_multiviews, rows=1).save(normal_path)
-
-        print(f"Generating normal maps took {t1 - t0:.2f} seconds")
 
         # Do it in batches of 6
         t0 = time.time()
@@ -160,4 +145,8 @@ if __name__ == "__main__":
         camera_azimuth_deg=[x - 90 for x in [0, 90, 180, 270, 180, 180]],
         use_topaz=args.topaz,
     )
-    print(f"Output saved to {out.shaded_model_save_path}")
+    if out.pbr_model_save_path is not None:
+        glb_path = out.pbr_model_save_path
+    else:
+        glb_path = out.shaded_model_save_path
+    print(f"Output saved to {glb_path}")
