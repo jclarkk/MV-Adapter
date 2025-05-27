@@ -205,7 +205,7 @@ with gr.Blocks() as demo:
             prompt, image_input, mesh_input, do_rembg, seed, randomize_seed,
             guidance_scale, num_inference_steps, reference_conditioning_scale,
             negative_prompt,
-            pbr, upscale, topaz, gr.Progress(track_tqdm=True)
+            pbr, upscale, topaz
         ],
         outputs=[
             result, pos_output, normal_output, preprocessed_image, used_seed, model_output,
