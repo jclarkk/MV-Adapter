@@ -8,6 +8,10 @@ from mvadapter.utils import make_image_grid
 
 from scripts.inference_ig2mv_sdxl import prepare_pipeline, remove_bg, run_pipeline
 
+from mvadapter.pipelines.pipeline_texture import TexturePipeline, ModProcessConfig
+import tempfile
+import os
+
 # Setup
 device = "cuda" if torch.cuda.is_available() else "cpu"
 dtype = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -27,6 +31,12 @@ pipe = prepare_pipeline(
     dtype=dtype,
 )
 
+texture_pipe = TexturePipeline(
+    upscaler_ckpt_path="./checkpoints/RealESRGAN_x2plus.pth",
+    inpaint_ckpt_path="./checkpoints/big-lama.pt",
+    device=device,
+)
+
 # Load BiRefNet
 birefnet = AutoModelForImageSegmentation.from_pretrained(
     "ZhengPeng7/BiRefNet", trust_remote_code=True
@@ -37,11 +47,12 @@ transform_image = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
 ])
 
+
 def infer(
-    prompt, image, mesh, do_rembg=True, seed=42, randomize_seed=False,
-    guidance_scale=3.0, num_inference_steps=50, reference_conditioning_scale=1.0,
-    negative_prompt="watermark, ugly, deformed, noisy, blurry, low contrast",
-    progress=gr.Progress(track_tqdm=True),
+        prompt, image, mesh, do_rembg=True, seed=42, randomize_seed=False,
+        guidance_scale=3.0, num_inference_steps=50, reference_conditioning_scale=1.0,
+        negative_prompt="watermark, ugly, deformed, noisy, blurry, low contrast",
+        progress=gr.Progress(track_tqdm=True),
 ):
     if randomize_seed:
         seed = random.randint(0, MAX_SEED)
@@ -68,7 +79,36 @@ def infer(
         device=device,
     )
 
-    return make_image_grid(images), make_image_grid(pos_images), make_image_grid(normal_images), preprocessed_image, seed
+    # Save multiview image to temporary file
+    tmpdir = tempfile.mkdtemp()
+    mv_path = os.path.join(tmpdir, "multiview.png")
+    make_image_grid(images, rows=1).save(mv_path)
+
+    # Generate shaded mesh
+    save_name = f"mesh_output_{seed}"
+    out = texture_pipe(
+        mesh_path=mesh.name,
+        save_dir=tmpdir,
+        save_name=save_name,
+        uv_unwarp=True,
+        preprocess_mesh=False,
+        uv_size=4096,
+        rgb_path=mv_path,
+        rgb_process_config=ModProcessConfig(view_upscale=True, inpaint_mode="view"),
+        camera_azimuth_deg=[x - 90 for x in [0, 90, 180, 270, 180, 180]],
+    )
+
+    glb_path = out.shaded_model_save_path  # should be .glb or similar
+
+    return (
+        make_image_grid(images),
+        make_image_grid(pos_images),
+        make_image_grid(normal_images),
+        preprocessed_image,
+        seed,
+        glb_path
+    )
+
 
 with gr.Blocks() as demo:
     gr.Markdown("# MV-Adapter 3D Mesh-Aware Multi-View Generator")
@@ -86,25 +126,28 @@ with gr.Blocks() as demo:
                 randomize_seed = gr.Checkbox(label="Randomize Seed", value=True)
                 guidance_scale = gr.Slider(label="CFG Scale", minimum=0, maximum=10, step=0.1, value=3.0)
                 num_inference_steps = gr.Slider(label="Inference Steps", minimum=1, maximum=100, step=1, value=50)
-                reference_conditioning_scale = gr.Slider(label="Reference Conditioning", minimum=0, maximum=2, step=0.1, value=1.0)
-                negative_prompt = gr.Textbox(label="Negative Prompt", value="watermark, ugly, deformed, noisy, blurry, low contrast")
+                reference_conditioning_scale = gr.Slider(label="Reference Conditioning", minimum=0, maximum=2, step=0.1,
+                                                         value=1.0)
+                negative_prompt = gr.Textbox(label="Negative Prompt",
+                                             value="watermark, ugly, deformed, noisy, blurry, low contrast")
 
         with gr.Column():
-            output_images = gr.Image(label="Multi-view Outputs")
-            pos_output = gr.Image(label="Position Maps")
-            normal_output = gr.Image(label="Normal Maps")
-            preprocessed_image = gr.Image(label="Preprocessed Image")
-            used_seed = gr.Textbox(label="Used Seed", interactive=False)
+            result = gr.Image()
+            pos_output = gr.Image()
+            normal_output = gr.Image()
+            preprocessed_image = gr.Image()
+            used_seed = gr.Textbox()
+            model_output = gr.Model3D(label="Textured 3D Model")
 
     run_button.click(
         fn=infer,
         inputs=[
             prompt, image_input, mesh_input, do_rembg, seed, randomize_seed,
             guidance_scale, num_inference_steps, reference_conditioning_scale,
-            negative_prompt
+            negative_prompt,
         ],
         outputs=[
-            output_images, pos_output, normal_output, preprocessed_image, used_seed
+            result, pos_output, normal_output, preprocessed_image, used_seed, model_output,
         ],
     )
 
