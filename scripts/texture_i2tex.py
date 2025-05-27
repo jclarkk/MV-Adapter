@@ -29,6 +29,7 @@ if __name__ == "__main__":
     parser.add_argument("--upscale", action="store_true")
     parser.add_argument("--pbr", action="store_true")
     parser.add_argument('--topaz', action='store_true')
+    parser.add_argument('--upscaler_path', type=str, default="./checkpoints/realesr-general-x4v3.pth")
     args = parser.parse_args()
 
     device = args.device
@@ -63,7 +64,7 @@ if __name__ == "__main__":
         remove_bg_fn = None
 
     texture_pipe = TexturePipeline(
-        upscaler_ckpt_path="./checkpoints/realesr-general-x4v3.pth",
+        upscaler_ckpt_path=args.upscaler_path,
         inpaint_ckpt_path="./checkpoints/big-lama.pt",
         device=device,
     )
