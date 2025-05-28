@@ -26,6 +26,7 @@ if __name__ == "__main__":
     parser.add_argument("--reference_conditioning_scale", type=float, default=1.0)
     parser.add_argument("--preprocess_mesh", action="store_true")
     parser.add_argument("--remove_bg", action="store_true")
+    parser.add_argument('--texture_size', type=int, default=1024)
     parser.add_argument("--upscale", action="store_true")
     parser.add_argument("--pbr", action="store_true")
     parser.add_argument('--topaz', action='store_true')
@@ -35,18 +36,8 @@ if __name__ == "__main__":
     device = args.device
     num_views = 6
 
-    # Prepare pipelines
-    pipe = prepare_pipeline(
-        base_model="lykon/dreamshaper-xl-v2-turbo",
-        vae_model="madebyollin/sdxl-vae-fp16-fix",
-        unet_model=None,
-        lora_model=None,
-        adapter_path="huanngzh/mv-adapter",
-        scheduler=None,
-        num_views=6,
-        device=device,
-        dtype=torch.float16,
-    )
+    t0 = time.time()
+
     if args.remove_bg:
         birefnet = AutoModelForImageSegmentation.from_pretrained(
             "ZhengPeng7/BiRefNet", trust_remote_code=True
@@ -63,16 +54,31 @@ if __name__ == "__main__":
     else:
         remove_bg_fn = None
 
+    # Prepare pipelines
+    pipe = prepare_pipeline(
+        base_model="lykon/dreamshaper-xl-v2-turbo",
+        vae_model="madebyollin/sdxl-vae-fp16-fix",
+        unet_model=None,
+        lora_model=None,
+        adapter_path="huanngzh/mv-adapter",
+        scheduler=None,
+        num_views=6,
+        device=device,
+        dtype=torch.float16,
+    )
+
     texture_pipe = TexturePipeline(
         upscaler_ckpt_path=args.upscaler_path,
         inpaint_ckpt_path="./checkpoints/big-lama.pt",
         device=device,
     )
-    print("Pipeline ready.")
+
+    t1 = time.time()
+    print(f"Pipeline preparation took {t1 - t0:.2f} seconds")
 
     os.makedirs(args.save_dir, exist_ok=True)
 
-    # 1. run MV-Adapter to generate multi-view images
+    t2 = time.time()
     images, _, _, _ = run_pipeline(
         pipe,
         mesh_path=args.mesh,
@@ -92,11 +98,14 @@ if __name__ == "__main__":
     mv_path = os.path.join(args.save_dir, f"{args.save_name}.png")
     make_image_grid(images, rows=1).save(mv_path)
 
+    t3 = time.time()
+    print(f"Multi view image generation took {t3 - t2:.2f} seconds")
+
     torch.cuda.empty_cache()
 
     normal_path, albedo_path, orm_path = None, None, None
     if args.pbr:
-        from mvadapter.pipelines.pipeline_pbr import generate_pbr_for_batch, RGB2XPipeline, StableNormalPipeline
+        from mvadapter.pipelines.pipeline_pbr import generate_pbr_for_batch, RGB2XPipeline
 
         # Replace the rgb
         albedo_path = os.path.join(args.save_dir, f"{args.save_name}.png")
@@ -105,9 +114,8 @@ if __name__ == "__main__":
         pre_pbr_multiviews = [view.resize((1024, 1024)) for view in images[:6]]
 
         # Do it in batches of 6
-        t0 = time.time()
+        t4 = time.time()
         albedo_multiviews, metallic_multiviews, _, roughness_multiviews = generate_pbr_for_batch(pre_pbr_multiviews)
-        t1 = time.time()
 
         metallic_path = os.path.join(args.save_dir, f"{args.save_name}_metallic.png")
         make_image_grid(metallic_multiviews, rows=1).save(metallic_path)
@@ -125,9 +133,10 @@ if __name__ == "__main__":
         orm_path = os.path.join(args.save_dir, f"{args.save_name}_orm.png")
         orm_image.save(orm_path)
 
-        print(f"Generating PBR maps took {t1 - t0:.2f} seconds")
+        t5 = time.time()
+        print(f"Generating PBR maps took {t5 - t4:.2f} seconds")
 
-    # 2. un-project and complete texture
+    t6 = time.time()
     out = texture_pipe(
         mesh_path=args.mesh,
         move_to_center=True,
@@ -135,7 +144,7 @@ if __name__ == "__main__":
         save_name=args.save_name,
         uv_unwarp=True,
         preprocess_mesh=args.preprocess_mesh,
-        uv_size=4096,
+        uv_size=args.texture_size,
         rgb_path=mv_path,
         rgb_process_config=ModProcessConfig(view_upscale=args.upscale, inpaint_mode="view"),
         base_color_path=albedo_path,
@@ -147,8 +156,13 @@ if __name__ == "__main__":
         camera_azimuth_deg=[x - 90 for x in [0, 90, 180, 270, 180, 180]],
         use_topaz=args.topaz,
     )
+    t7 = time.time()
+    print(f"Texture projection took {t7 - t6:.2f} seconds")
+
     if out.pbr_model_save_path is not None:
         glb_path = out.pbr_model_save_path
     else:
         glb_path = out.shaded_model_save_path
     print(f"Output saved to {glb_path}")
+
+    print(f"Total time taken: {t7 - t0:.2f} seconds")

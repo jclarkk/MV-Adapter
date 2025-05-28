@@ -54,7 +54,7 @@ def infer(
         prompt, image, mesh, do_rembg=True, seed=42, randomize_seed=False,
         guidance_scale=3.0, num_inference_steps=16, reference_conditioning_scale=1.0,
         negative_prompt="watermark, ugly, deformed, noisy, blurry, low contrast",
-        preprocess_mesh=False, pbr=False, upscale=True, topaz=False,
+        preprocess_mesh=False, pbr=False, upscale=True, topaz=False, texture_size=1024
 ):
     if randomize_seed:
         seed = random.randint(0, MAX_SEED)
@@ -130,7 +130,7 @@ def infer(
         save_dir=tmpdir,
         save_name=save_name,
         uv_unwarp=True,
-        uv_size=4096,
+        uv_size=texture_size,
         rgb_path=mv_path,
         rgb_process_config=ModProcessConfig(view_upscale=upscale, inpaint_mode="view"),
         base_color_path=albedo_path,
@@ -179,7 +179,9 @@ with gr.Blocks() as demo:
                                                          value=1.0)
                 negative_prompt = gr.Textbox(label="Negative Prompt",
                                              value="watermark, ugly, deformed, noisy, blurry, low contrast")
-                preprocess_mesh = gr.Checkbox(label="Pre-Process Mesh", value=True)
+                preprocess_mesh = gr.Checkbox(label="Pre-Process Mesh", value=False)
+                texture_size = gr.Slider(minimum=1024, maximum=4096, step=1024, value=4096,
+                                         label='Texture Resolution')
                 upscale = gr.Checkbox(label="Upscale", value=True)
                 pbr = gr.Checkbox(label="Generate PBR Maps", value=False)
                 topaz = gr.Checkbox(label="Use Topaz Upscaling", value=False)
@@ -198,7 +200,7 @@ with gr.Blocks() as demo:
             prompt, image_input, mesh_input, do_rembg, seed, randomize_seed,
             guidance_scale, num_inference_steps, reference_conditioning_scale,
             negative_prompt,
-            preprocess_mesh, pbr, upscale, topaz
+            preprocess_mesh, pbr, upscale, topaz,texture_size
         ],
         outputs=[
             result, pos_output, normal_output, preprocessed_image, used_seed, model_output,
