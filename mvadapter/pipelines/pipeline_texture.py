@@ -95,10 +95,28 @@ class TexturePipeline:
                 from mvadapter.utils.topaz import TopazAPIUpscalerPipeline
                 topaz_upscaler = TopazAPIUpscalerPipeline()
 
-                tensor = tensor.squeeze()
-                img = tensor_to_image(tensor, batched=False)
-                upscaled_img = topaz_upscaler(img)
-                tensor = image_to_tensor([upscaled_img], device=self.device)[0]
+                from torchvision import transforms
+
+                to_pil = transforms.ToPILImage()
+                to_tensor = transforms.ToTensor()
+
+                if tensor.dim() == 4:
+                    batch = tensor
+                elif tensor.dim() == 5 and tensor.shape[0] == 1:
+                    batch = tensor.squeeze(0)
+                else:
+                    raise ValueError(f"Unexpected tensor shape for upscaling: {tensor.shape}")
+
+                upscaled = []
+                for i in range(batch.shape[0]):
+                    image_tensor = batch[i]
+                    chw = image_tensor.permute(2, 0, 1).contiguous()
+                    pil_img = to_pil(chw.cpu().clamp(0, 1))
+                    upscaled_pil = topaz_upscaler(pil_img)
+                    upscaled_tensor = to_tensor(upscaled_pil).permute(1, 2, 0)
+                    upscaled.append(upscaled_tensor)
+
+                tensor = torch.stack(upscaled).to(self.device)
 
                 t1 = time.time()
                 print(f"Topaz upscaling took {t1 - t0:.2f} seconds")
