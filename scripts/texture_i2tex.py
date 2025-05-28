@@ -29,7 +29,7 @@ if __name__ == "__main__":
     parser.add_argument("--upscale", action="store_true")
     parser.add_argument("--pbr", action="store_true")
     parser.add_argument('--topaz', action='store_true')
-    parser.add_argument('--upscaler_path', type=str, default="./checkpoints/realesr-general-x4v3.pth")
+    parser.add_argument('--upscaler_path', type=str, default="./checkpoints/4x_NMKD-Siax_200k.pth")
     args = parser.parse_args()
 
     device = args.device
@@ -130,6 +130,7 @@ if __name__ == "__main__":
     # 2. un-project and complete texture
     out = texture_pipe(
         mesh_path=args.mesh,
+        move_to_center=True,
         save_dir=args.save_dir,
         save_name=args.save_name,
         uv_unwarp=True,

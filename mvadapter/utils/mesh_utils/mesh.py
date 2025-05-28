@@ -349,7 +349,7 @@ def replace_mesh_texture_and_save_trimesh(
         Union[Image.Image, np.ndarray, torch.Tensor]
     ] = None,
     normal_texture: Optional[Union[Image.Image, np.ndarray, torch.Tensor]] = None,
-    texture_format: str = "JPEG",
+    texture_format: str = "PNG",
     task_id: str = "",
     **kwargs,
 ) -> None:
@@ -394,7 +394,6 @@ def replace_mesh_texture_and_save_trimesh(
     def p_func(tree, task_id_in=task_id):
         if "nodes" in tree and tree["nodes"][0]["name"].find("world") >= 0:
             tree["nodes"].pop(0)
-        tree["asset"]["generator"] = "https://github.com/huanngzh/MV-Adapter"
         change_dict = {
             "nodes": "node",
             "meshes": "mesh",
@@ -404,7 +403,7 @@ def replace_mesh_texture_and_save_trimesh(
         for k, v in change_dict.items():
             if k in tree:
                 for index in range(len(tree[k])):
-                    tree[k][index]["name"] = f"mvadapter_{v}_{task_id_in}"
+                    tree[k][index]["name"] = f"{v}_{task_id_in}"
 
     tmesh.export(output_path, tree_postprocessor=p_func)
 
@@ -417,7 +416,7 @@ def replace_mesh_texture_and_save_gltflib(
         Union[Image.Image, np.ndarray, torch.Tensor]
     ] = None,
     normal_texture: Optional[Union[Image.Image, np.ndarray, torch.Tensor]] = None,
-    texture_format: str = "JPEG",
+    texture_format: str = "PNG",
     normal_strength: float = 1.0,
     task_id: str = "",
     **kwargs,
@@ -432,9 +431,9 @@ def replace_mesh_texture_and_save_gltflib(
         return texture
 
     def add_texture(gltf: GLTF, image: Image.Image) -> int:
-        jpeg_buffer = io.BytesIO()
-        image.save(jpeg_buffer, format=texture_format)
-        new_texture_data = bytearray(jpeg_buffer.getvalue())
+        img_buffer = io.BytesIO()
+        image.save(img_buffer, format=texture_format)
+        new_texture_data = bytearray(img_buffer.getvalue())
         _, offset, bytelen = gltf._create_or_extend_glb_resource(new_texture_data)
         bufferView = gltf._create_embedded_image_buffer_view(offset, bytelen)
         image = gltfImage(mimeType="image/jpeg", bufferView=bufferView)
@@ -478,10 +477,9 @@ def replace_mesh_texture_and_save_gltflib(
             index=add_texture(gltf, normal_texture), scale=normal_strength
         )
 
-    gltf.model.nodes[0].name = f"mvadapter_node_{task_id}"
-    gltf.model.meshes[0].name = f"mvadapter_mesh_{task_id}"
-    gltf.model.materials[0].name = f"mvadapter_material_{task_id}"
-    gltf.model.asset.generator = "https://github.com/huanngzh/MV-Adapter"
+    gltf.model.nodes[0].name = f"node_{task_id}"
+    gltf.model.meshes[0].name = f"mesh_{task_id}"
+    gltf.model.materials[0].name = f"material_{task_id}"
     gltf.export(output_path)
 
 
@@ -494,7 +492,7 @@ def replace_mesh_texture_and_save(
     ] = None,
     normal_texture: Optional[Union[Image.Image, np.ndarray, torch.Tensor]] = None,
     normal_strength: float = 1.0,
-    texture_format: str = "JPEG",
+    texture_format: str = "PNG",
     task_id: str = "",
     backend: str = "trimesh",
 ) -> None:

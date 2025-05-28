@@ -34,7 +34,7 @@ pipe = prepare_pipeline(
 )
 
 texture_pipe = TexturePipeline(
-    upscaler_ckpt_path="./checkpoints/RealESRGAN_x2plus.pth",
+    upscaler_ckpt_path="./checkpoints/4x_NMKD-Siax_200k.pth",
     inpaint_ckpt_path="./checkpoints/big-lama.pt",
     device=device,
 )
@@ -54,8 +54,7 @@ def infer(
         prompt, image, mesh, do_rembg=True, seed=42, randomize_seed=False,
         guidance_scale=3.0, num_inference_steps=16, reference_conditioning_scale=1.0,
         negative_prompt="watermark, ugly, deformed, noisy, blurry, low contrast",
-        pbr=False, upscale=True, topaz=False,
-        progress=gr.Progress(track_tqdm=True),
+        preprocess_mesh=False, pbr=False, upscale=True, topaz=False,
 ):
     if randomize_seed:
         seed = random.randint(0, MAX_SEED)
@@ -79,12 +78,14 @@ def infer(
         reference_conditioning_scale=reference_conditioning_scale,
         negative_prompt=negative_prompt,
         lora_scale=1.0,
-        device=device,
+        device=device
     )
 
     # Save multiview image to temporary file
     tmpdir = tempfile.mkdtemp()
     mv_path = os.path.join(tmpdir, "multiview.png")
+    for i, view in enumerate(images):
+        images[i].save(os.path.join(tmpdir, 'multiview_view_{}.png'.format(i)), format='PNG')
     make_image_grid(images, rows=1).save(mv_path)
 
     normal_path, albedo_path, orm_path = None, None, None
@@ -124,6 +125,8 @@ def infer(
     save_name = f"mesh_output_{seed}"
     out = texture_pipe(
         mesh_path=mesh.name,
+        move_to_center=True,
+        preprocess_mesh=preprocess_mesh,
         save_dir=tmpdir,
         save_name=save_name,
         uv_unwarp=True,
@@ -138,6 +141,7 @@ def infer(
         normal_process_config=ModProcessConfig(view_upscale=False, inpaint_mode="view"),
         camera_azimuth_deg=[x - 90 for x in [0, 90, 180, 270, 180, 180]],
         use_topaz=topaz,
+        debug_mode=True
     )
 
     if out.pbr_model_save_path is not None:
@@ -175,6 +179,7 @@ with gr.Blocks() as demo:
                                                          value=1.0)
                 negative_prompt = gr.Textbox(label="Negative Prompt",
                                              value="watermark, ugly, deformed, noisy, blurry, low contrast")
+                preprocess_mesh = gr.Checkbox(label="Pre-Process Mesh", value=True)
                 upscale = gr.Checkbox(label="Upscale", value=True)
                 pbr = gr.Checkbox(label="Generate PBR Maps", value=False)
                 topaz = gr.Checkbox(label="Use Topaz Upscaling", value=False)
@@ -193,7 +198,7 @@ with gr.Blocks() as demo:
             prompt, image_input, mesh_input, do_rembg, seed, randomize_seed,
             guidance_scale, num_inference_steps, reference_conditioning_scale,
             negative_prompt,
-            pbr, upscale, topaz
+            preprocess_mesh, pbr, upscale, topaz
         ],
         outputs=[
             result, pos_output, normal_output, preprocessed_image, used_seed, model_output,

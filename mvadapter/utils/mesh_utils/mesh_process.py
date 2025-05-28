@@ -169,7 +169,7 @@ def process_mesh(
     faces,
     threshold=0.0001,
     mincomponentRatio=0.02,
-    targetfacenum=50000,
+    targetfacenum=200000,
     maxholesize=30,
     stepsmoothnum=10,
     verbose=False,
@@ -186,7 +186,7 @@ def process_mesh(
     )
 
     ### Hole Filling
-    repair_non_manifold(ms)  # repair before fix hole
+    repair_non_manifold(ms)
     fix_hole(ms, maxholesize=maxholesize, verbose=verbose)
 
     ### Taubin Smoothing

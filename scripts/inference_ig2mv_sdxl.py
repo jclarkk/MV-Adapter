@@ -146,7 +146,7 @@ def run_pipeline(
     )
     ctx = NVDiffRastContextWrapper(device=device)
 
-    mesh = load_mesh(mesh_path, rescale=True, device=device)
+    mesh = load_mesh(mesh_path, rescale=True, device=device, move_to_center=True)
     render_out = render(
         ctx,
         mesh,
