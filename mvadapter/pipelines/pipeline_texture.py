@@ -235,6 +235,7 @@ class TexturePipeline:
                 mod_tensor,
                 mod_process_config.view_upscale,
                 mod_process_config.view_upscale_factor,
+                use_topaz=use_topaz
             )
             if mod_process_config.view_upscale and debug_mode:
                 make_image_grid(tensor_to_image(mod_tensor, batched=True), rows=1).save(
