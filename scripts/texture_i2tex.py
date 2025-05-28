@@ -4,10 +4,12 @@ import time
 
 import numpy
 import torch
+import trimesh
 from PIL import Image
 from torchvision import transforms
 from transformers import AutoModelForImageSegmentation
 
+from mvadapter.models.bpt.pipeline import BPTPipeline
 from mvadapter.pipelines.pipeline_texture import ModProcessConfig, TexturePipeline
 from mvadapter.utils import make_image_grid
 from .inference_ig2mv_sdxl import prepare_pipeline, remove_bg, run_pipeline
@@ -31,6 +33,7 @@ if __name__ == "__main__":
     parser.add_argument("--pbr", action="store_true")
     parser.add_argument('--topaz', action='store_true')
     parser.add_argument('--upscaler_path', type=str, default="./checkpoints/4x_NMKD-Siax_200k.pth")
+    parser.add_argument("--bpt", action="store_true", help="Use BPT re-meshing")
     args = parser.parse_args()
 
     device = args.device
@@ -53,6 +56,14 @@ if __name__ == "__main__":
         remove_bg_fn = lambda x: remove_bg(x, birefnet, transform_image, args.device)
     else:
         remove_bg_fn = None
+
+    if args.bpt:
+        mesh = trimesh.load_mesh(args.mesh, force="mesh")
+        # BPT re-meshing
+        pipeline = BPTPipeline.from_pretrained()
+        mesh = pipeline(mesh)
+        # Save the re-meshed mesh
+        mesh.export(args.mesh)
 
     # Prepare pipelines
     pipe = prepare_pipeline(
