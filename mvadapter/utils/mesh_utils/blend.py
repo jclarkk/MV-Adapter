@@ -1,106 +1,12 @@
-import time
-from abc import ABC, abstractmethod
+from abc import ABC
 
 import torch
 import torch.nn.functional as F
 import triton
 import triton.language as tl
-from torch.utils.cpp_extension import load_inline
+from torch.utils.cpp_extension import load
 
 from .utils import SINGLE_IMAGE_TYPE, image_to_tensor
-
-pb_solver_cpp_source = """
-#include <torch/extension.h>
-
-#include <vector>
-
-// CUDA forward declarations
-
-void pb_solver_run_cuda(
-    torch::Tensor A,
-    torch::Tensor X,
-    torch::Tensor B,
-    torch::Tensor Xbuf,
-    int num_iters
-);
-
-// C++ interface
-
-#define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x " must be a CUDA tensor")
-#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
-#define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
-
-void pb_solver_run(
-    torch::Tensor A,
-    torch::Tensor X,
-    torch::Tensor B,
-    torch::Tensor Xbuf,
-    int num_iters
-) {
-    CHECK_INPUT(A);
-    CHECK_INPUT(X);
-    CHECK_INPUT(B);
-    CHECK_INPUT(Xbuf);
-
-    pb_solver_run_cuda(A, X, B, Xbuf, num_iters);
-    return;
-}
-
-"""
-
-pb_solver_cuda_source = """
-#include <torch/extension.h>
-
-#include <cuda.h>
-#include <cuda_runtime.h>
-
-#include <algorithm>
-
-
-__global__ void pb_solver_run_cuda_kernel(
-    torch::PackedTensorAccessor32<int64_t,2,torch::RestrictPtrTraits> A,
-    torch::PackedTensorAccessor32<float,1,torch::RestrictPtrTraits> X,
-    torch::PackedTensorAccessor32<float,1,torch::RestrictPtrTraits> B,
-    torch::PackedTensorAccessor32<float,1,torch::RestrictPtrTraits> Xbuf
-) {
-    const int index = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    if (index < A.size(0)) {
-        Xbuf[index] = (X[A[index][0]] + X[A[index][1]] + X[A[index][2]] + X[A[index][3]] + B[index]) / 4.;
-    }
-}
-
-void pb_solver_run_cuda(
-    torch::Tensor A,
-    torch::Tensor X,
-    torch::Tensor B,
-    torch::Tensor Xbuf,
-    int num_iters
-) {
-    int batch_size = A.size(0);
-
-    const int threads = 1024;
-    const dim3 blocks((batch_size + threads - 1) / threads);
-    
-    auto A_ptr = A.packed_accessor32<int64_t,2,torch::RestrictPtrTraits>();
-    auto X_ptr = X.packed_accessor32<float,1,torch::RestrictPtrTraits>();
-    auto B_ptr = B.packed_accessor32<float,1,torch::RestrictPtrTraits>();
-    auto Xbuf_ptr = Xbuf.packed_accessor32<float,1,torch::RestrictPtrTraits>();
-
-    for (int i = 0; i < num_iters; ++i) {
-        pb_solver_run_cuda_kernel<<<blocks, threads>>>(
-            A_ptr,
-            X_ptr,
-            B_ptr,
-            Xbuf_ptr
-        );
-        cudaDeviceSynchronize();
-        std::swap(X_ptr, Xbuf_ptr);
-    }
-    // we may waste an iteration here, but it's fine
-    return;
-}
-"""
 
 
 class PBBackend(ABC):
@@ -150,12 +56,13 @@ except:
 
 class PBTorchCUDAKernelBackend(PBBackend):
     def __init__(self) -> None:
-        self.kernel = load_inline(
+        self.kernel = load(
             name="pb_solver",
-            cpp_sources=[pb_solver_cpp_source],
-            cuda_sources=[pb_solver_cuda_source],
-            functions=["pb_solver_run"],
-            verbose=True,
+            sources=[
+                "./pb_solver/pb_solver.cpp",
+                "./pb_solver/pb_solver.cu"
+            ],
+            verbose=True
         )
 
     def solve(self, num_iters, A, X, B, Xbuf) -> None:
