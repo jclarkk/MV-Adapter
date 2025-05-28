@@ -14,14 +14,15 @@ class TopazAPIUpscalerPipeline:
     def __init__(self, mode: str = 'enhance'):
         self.topaz_api_key = os.getenv('TOPAZ_API_KEY')
         self.topaz_url = 'https://api.topazlabs.com/image/v1/enhance'
-        self.output_height = 4096
-        self.output_width = 4096
         self.model = 'Standard V2'
         self.output_format = 'png'
         self.max_retries = 5
         self.backoff_base = 2
 
     def __call__(self, input_image: Image.Image) -> Image.Image:
+        new_height = input_image.height * 4
+        new_width = input_image.width * 4
+
         image_bytes = BytesIO()
         input_image.save(image_bytes, format='PNG')
         image_bytes.seek(0)
@@ -37,8 +38,8 @@ class TopazAPIUpscalerPipeline:
 
         data = {
             'model': self.model,
-            'output_height': self.output_height,
-            'output_width': self.output_width,
+            'output_height': new_height,
+            'output_width': new_width,
             'output_format': self.output_format
         }
 

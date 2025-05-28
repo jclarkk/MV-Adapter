@@ -1,4 +1,5 @@
 import os
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Union
@@ -90,6 +91,7 @@ class TexturePipeline:
     ) -> Optional[torch.FloatTensor]:
         if upscale:
             if use_topaz:
+                t0 = time.time()
                 from mvadapter.utils.topaz import TopazAPIUpscalerPipeline
                 topaz_upscaler = TopazAPIUpscalerPipeline()
 
@@ -98,6 +100,9 @@ class TexturePipeline:
                 img = tensor_to_image(tensor, batched=False)
                 upscaled_img = topaz_upscaler(img)
                 tensor = image_to_tensor([upscaled_img], device=self.device)[0]
+
+                t1 = time.time()
+                print(f"Topaz upscaling took {t1 - t0:.2f} seconds")
             else:
                 with torch.no_grad():
                     tensor = tensor.permute(0, 3, 1, 2)
