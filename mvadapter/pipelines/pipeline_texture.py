@@ -95,8 +95,7 @@ class TexturePipeline:
                 from mvadapter.utils.topaz import TopazAPIUpscalerPipeline
                 topaz_upscaler = TopazAPIUpscalerPipeline()
 
-                while tensor.dim() > 3:
-                    tensor = tensor.squeeze(0)
+                tensor = tensor.squeeze()
                 img = tensor_to_image(tensor, batched=False)
                 upscaled_img = topaz_upscaler(img)
                 tensor = image_to_tensor([upscaled_img], device=self.device)[0]
