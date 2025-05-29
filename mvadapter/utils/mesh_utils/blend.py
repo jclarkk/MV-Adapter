@@ -1,3 +1,6 @@
+import os
+import importlib.util
+import sys
 from abc import ABC
 
 import torch
@@ -56,14 +59,34 @@ except:
 
 class PBTorchCUDAKernelBackend(PBBackend):
     def __init__(self) -> None:
-        self.kernel = load(
-            name="pb_solver",
-            sources=[
-                "./pb_solver/pb_solver.cpp",
-                "./pb_solver/pb_solver.cu"
-            ],
-            verbose=True
-        )
+        so_path = os.getenv("PB_SOLVER_PATH")
+        self.kernel = None
+
+        try:
+            if so_path is not None and os.path.exists(so_path):
+                print(f"[INFO] Attempting to load precompiled pb_solver.so from: {so_path}")
+                spec = importlib.util.spec_from_file_location("pb_solver", so_path)
+                module = importlib.util.module_from_spec(spec)
+                sys.modules["pb_solver"] = module
+                spec.loader.exec_module(module)
+                self.kernel = module
+                print("[INFO] Successfully loaded precompiled pb_solver.so")
+            else:
+                print(f"[WARN] Precompiled pb_solver.so not found at: {so_path}")
+        except Exception as e:
+            print(f"[WARN] Failed to load precompiled pb_solver.so: {e}")
+
+        if self.kernel is None:
+            print("[INFO] Falling back to torch.utils.cpp_extension.load()...")
+            self.kernel = load(
+                name="pb_solver",
+                sources=[
+                    "./pb_solver/pb_solver.cpp",
+                    "./pb_solver/pb_solver.cu"
+                ],
+                verbose=True
+            )
+            print("[INFO] Compilation complete")
 
     def solve(self, num_iters, A, X, B, Xbuf) -> None:
         self.kernel.pb_solver_run(A, X, B, Xbuf, num_iters)
