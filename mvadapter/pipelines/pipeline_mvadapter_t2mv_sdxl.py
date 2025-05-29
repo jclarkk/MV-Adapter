@@ -649,20 +649,20 @@ class MVAdapterT2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
                         callback(step_idx, t, latents)
 
         if not output_type == "latent":
-            # Force VAE to float32 mode
-            self.vae.to(dtype=torch.float32)
+            # Use built-in method to safely upcast VAE to float32
+            self.upcast_vae()
 
-            # Ensure latents are float32 too
+            # Ensure latents match dtype
             latents = latents.to(dtype=torch.float32)
 
-            # Decode safely
+            # Decode image
             image = self.vae.decode(latents, return_dict=False)[0]
 
-            # Sanitize output to prevent artifacts
+            # Sanitize output to avoid artifacts
             image = torch.nan_to_num(image, nan=0.0, posinf=1.0, neginf=0.0)
             image = image.clamp(0, 1)
 
-            # Move VAE back to float16 to avoid unnecessary VRAM use
+            # Optional: move back to float16 if needed (if continuing use)
             self.vae.to(dtype=torch.float16)
 
             # unscale/denormalize the latents
