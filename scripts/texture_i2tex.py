@@ -13,6 +13,7 @@ from mvadapter.pipelines.pipeline_texture import ModProcessConfig, TexturePipeli
 from mvadapter.utils import make_image_grid
 from .inference_ig2mv_sdxl import prepare_pipeline, remove_bg, run_pipeline
 
+torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = False
 
 if __name__ == "__main__":

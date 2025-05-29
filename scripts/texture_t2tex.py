@@ -12,6 +12,9 @@ from mvadapter.pipelines.pipeline_texture import ModProcessConfig, TexturePipeli
 from mvadapter.utils import make_image_grid
 from .inference_tg2mv_sdxl import prepare_pipeline, run_pipeline
 
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = False
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", type=str, default="cuda")
