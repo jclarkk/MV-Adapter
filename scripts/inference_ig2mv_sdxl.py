@@ -41,6 +41,7 @@ def prepare_pipeline(
     # Prepare pipeline
     pipe: MVAdapterI2MVSDXLPipeline
     pipe = MVAdapterI2MVSDXLPipeline.from_pretrained(base_model, **pipe_kwargs)
+    pipe.vae.config.force_upcast = True
 
     # Load scheduler if provided
     scheduler_class = None

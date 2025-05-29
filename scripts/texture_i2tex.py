@@ -9,10 +9,11 @@ from PIL import Image
 from torchvision import transforms
 from transformers import AutoModelForImageSegmentation
 
-from mvadapter.models.bpt.pipeline import BPTPipeline
 from mvadapter.pipelines.pipeline_texture import ModProcessConfig, TexturePipeline
 from mvadapter.utils import make_image_grid
 from .inference_ig2mv_sdxl import prepare_pipeline, remove_bg, run_pipeline
+
+torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = False
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -58,6 +59,8 @@ if __name__ == "__main__":
         remove_bg_fn = None
 
     if args.bpt:
+        from mvadapter.models.bpt.pipeline import BPTPipeline
+
         mesh = trimesh.load_mesh(args.mesh, force="mesh")
         # BPT re-meshing
         pipeline = BPTPipeline.from_pretrained()

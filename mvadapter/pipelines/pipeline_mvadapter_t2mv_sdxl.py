@@ -649,20 +649,18 @@ class MVAdapterT2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
                         callback(step_idx, t, latents)
 
         if not output_type == "latent":
-            # make sure the VAE is in float32 mode, as it overflows in float16
-            needs_upcasting = (
-                self.vae.dtype == torch.float16 and self.vae.config.force_upcast
-            )
+            self.vae.to(dtype=torch.float32)
+            latents = latents.to(dtype=torch.float32)
 
-            if needs_upcasting:
-                self.upcast_vae()
-                latents = latents.to(
-                    next(iter(self.vae.post_quant_conv.parameters())).dtype
-                )
-            elif latents.dtype != self.vae.dtype:
-                if torch.backends.mps.is_available():
-                    # some platforms (eg. apple mps) misbehave due to a pytorch bug: https://github.com/pytorch/pytorch/pull/99272
-                    self.vae = self.vae.to(latents.dtype)
+            # Decode latents
+            image = self.vae.decode(latents, return_dict=False)[0]
+
+            # Clamp and sanitize output (float32 → [0, 1])
+            image = torch.nan_to_num(image, nan=0.0, posinf=1.0, neginf=0.0)
+            image = image.clamp(0, 1)
+
+            # Convert VAE back to float16
+            self.vae.to(dtype=torch.float16)
 
             # unscale/denormalize the latents
             # denormalize with the mean and std if available and not None

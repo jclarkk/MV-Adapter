@@ -38,7 +38,14 @@ def tensor_to_image(
     if isinstance(data, Image.Image):
         return data
     if isinstance(data, torch.Tensor):
-        data = data.detach().cpu().numpy()
+        data = data.detach().cpu()
+
+        # float16 safety
+        data = torch.nan_to_num(data, nan=0.0, posinf=1.0, neginf=0.0)
+        data = data.clamp(0, 1)
+
+        data = data.numpy()
+
     if data.dtype == np.float32 or data.dtype == np.float16:
         data = (data * 255).astype(np.uint8)
     elif data.dtype == np.bool_:
