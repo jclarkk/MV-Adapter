@@ -2,15 +2,13 @@ import argparse
 
 import numpy as np
 import torch
-from diffusers import AutoencoderKL, DDPMScheduler, LCMScheduler, UNet2DConditionModel
+from diffusers import AutoencoderKL, DPMSolverMultistepScheduler, UNet2DConditionModel
 from PIL import Image
 from torchvision import transforms
-from tqdm import tqdm
 from transformers import AutoModelForImageSegmentation
 
 from mvadapter.models.attention_processor import DecoupledMVRowColSelfAttnProcessor2_0
 from mvadapter.pipelines.pipeline_mvadapter_i2mv_sdxl import MVAdapterI2MVSDXLPipeline
-from mvadapter.schedulers.scheduling_shift_snr import ShiftSNRScheduler
 from mvadapter.utils import make_image_grid, tensor_to_image
 from mvadapter.utils.mesh_utils import (
     NVDiffRastContextWrapper,
@@ -43,18 +41,11 @@ def prepare_pipeline(
     pipe = MVAdapterI2MVSDXLPipeline.from_pretrained(base_model, **pipe_kwargs)
     pipe.vae.config.force_upcast = True
 
-    # Load scheduler if provided
-    scheduler_class = None
-    if scheduler == "ddpm":
-        scheduler_class = DDPMScheduler
-    elif scheduler == "lcm":
-        scheduler_class = LCMScheduler
-
-    pipe.scheduler = ShiftSNRScheduler.from_scheduler(
-        pipe.scheduler,
-        shift_mode="interpolated",
-        shift_scale=8.0,
-        scheduler_class=scheduler_class,
+    pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+        pipe.scheduler.config,
+        algorithm_type="dpmsolver++",
+        use_karras_sigmas=True,
+        solver_order=2
     )
     pipe.init_custom_adapter(
         num_views=num_views, self_attn_processor=DecoupledMVRowColSelfAttnProcessor2_0

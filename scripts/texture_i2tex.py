@@ -77,7 +77,7 @@ if __name__ == "__main__":
         unet_model=None,
         lora_model=None,
         adapter_path="huanngzh/mv-adapter",
-        scheduler=None,
+        scheduler="ddpm",
         num_views=6,
         device=device,
         dtype=torch.float16,
