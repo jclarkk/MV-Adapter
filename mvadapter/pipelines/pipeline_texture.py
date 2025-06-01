@@ -150,7 +150,7 @@ class TexturePipeline:
             image: torch.FloatTensor, mask: torch.FloatTensor
         ) -> torch.FloatTensor:
             with torch.no_grad():
-                return self.inpainter(image, mask)
+                return self.inpainter(image.to(torch.float32), mask.to(torch.float32))
 
         return self.smart_painter(
             mod_name,
